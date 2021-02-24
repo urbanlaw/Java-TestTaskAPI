@@ -51,6 +51,7 @@ public class ApiServer
      */
     public void addRoute(String path, ApiHandler apiHandler)
     {
+        apiHandler.setHandlePath(path);
         apiHandler.setLog(this.log);
         apiHandler.setDB(db);
         apiHandler.init();

@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -19,12 +20,9 @@ import components.DB;
  */
 public abstract class ApiHandler implements HttpHandler
 {
-    //private static final String ENCODING = "UTF-8";
-
+    private String handlePath;
     protected Logger log;
     protected DB db;
-
-    //protected HttpContext context;
     protected HttpExchange exchange;
     protected HashMap<String, String> request;
 
@@ -43,20 +41,27 @@ public abstract class ApiHandler implements HttpHandler
     @Override
     public final void handle(HttpExchange exchange) throws IOException
     {
-        this.exchange = exchange;
-        this.request = this.parseRequest();
-
-        try
+        if(exchange.getRequestURI().getPath().equals(this.handlePath))
         {
-            if(authorize())
+            this.exchange = exchange;
+            this.request = this.parseRequest();
+
+            try
             {
-                this.handleRequest();
+                if (authorize())
+                {
+                    this.handleRequest();
+                }
+            }
+            catch (Exception ex)
+            {
+                log.log(Level.SEVERE, "", ex);
+                exchange.sendResponseHeaders(500, -1);
             }
         }
-        catch (Exception ex)
+        else
         {
-            log.log(Level.SEVERE, "", ex);
-            exchange.sendResponseHeaders(500, -1);
+            exchange.sendResponseHeaders(404, -1);
         }
 
         exchange.close();
@@ -77,6 +82,11 @@ public abstract class ApiHandler implements HttpHandler
     public void setDB(DB db)
     {
         this.db = db;
+    }
+
+    public void setHandlePath(String path)
+    {
+        this.handlePath = path;
     }
 
     /**
@@ -110,7 +120,7 @@ public abstract class ApiHandler implements HttpHandler
 
     protected boolean authorize()
     {
-        if(!authorizationRequired)
+        if (!authorizationRequired)
         {
             return true;
         }
@@ -123,7 +133,7 @@ public abstract class ApiHandler implements HttpHandler
 
             ResultSet rs = db.query("SELECT * FROM user WHERE ? < tokenExpire AND token = ?", currentTS.toString(), token);
 
-            if(rs.next())
+            if (rs.next())
             {
                 Timestamp tokenExpire = new Timestamp(currentTime + Config.TOKEN_TTL);
                 rs.updateTimestamp("tokenExpire", tokenExpire);
@@ -166,7 +176,6 @@ public abstract class ApiHandler implements HttpHandler
         HashMap<String, String> result = new HashMap<>();
 
         String queryStr = this.exchange.getRequestURI().getQuery();
-
         if (queryStr != null)
         {
             for (String param : queryStr.split("&"))
